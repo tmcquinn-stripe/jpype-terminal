@@ -131,7 +131,7 @@ def discoverReaders():
     Terminal.getInstance().discoverReaders(config, custom_discovery_listener, DiscoverReadersCallback())
 
 def connectReader():
-    config = ConnectionConfiguration.UsbConnectionConfiguration("tml_F1tnASMOFaT8aA", False, custom_mobile_reader_listener)
+    config = ConnectionConfiguration.UsbConnectionConfiguration("{{TERMINAL_LOCATION}}", False, custom_mobile_reader_listener)
     Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[1], config, ConnectReadersCallback())
 
 def createConfirmSetupIntent():
