@@ -135,9 +135,10 @@ def connectReader():
     Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[1], config, ConnectReadersCallback())
 
 def createConfirmSetupIntent():
+    # Creating a Customer on the client, again just for illustration, this would have been done on a server
     setup_intent = client.setup_intents.create(params={
         "payment_method_types":["card_present"],
-        "customer":"cus_S0CJDcbIrzcdox",
+        "customer":"{{CUSTOMER_ID}}",
     })
     setup_intent_retrieve_callback = SetupIntentCallback()
 
