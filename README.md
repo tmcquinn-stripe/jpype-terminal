@@ -6,4 +6,6 @@ Make a copy of .env.example, and provide values for SECRET_API_KEY, TERMINAL_LOC
 
 run `pip install -r requirements.txt` to install required packages
 
+run `python3 main.py` to run the script
+
 
