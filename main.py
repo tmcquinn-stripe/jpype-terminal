@@ -2,14 +2,26 @@ import jpype
 import time
 import jpype.imports
 import stripe 
+import dotenv
+import os
 
 from jpype.types import *
 from jpype import JImplements, JOverride, JImplementationFor
 from stripe import StripeClient
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+SECRET_API_KEY = os.getenv('SECRET_API_KEY')
+TERMINAL_LOCATION_ID = os.getenv('TERMINAL_LOCATION_ID')
+CUSTOMER_ID = os.getenv('CUSTOMER_ID')
+
+
 
 # This is for illustration only, 
 # Terminal SDKs should call a backend service to retrieve a connection token.
-client = StripeClient("{{SECRET API KEY}}")
+client = StripeClient(SECRET_API_KEY)
 jpype.startJVM(classpath=['target/samplejar.jar'])
 
 from com.stripe.stripeterminal import *
@@ -93,12 +105,21 @@ class DiscoverReadersCallback:
 
 @JImplements(ReaderCallback)
 class ConnectReadersCallback:
+    def __init__(self):
+        self.reader = None
+        self.is_complete = False
+        self.failed = False
+
     @JOverride
     def onSuccess(self, reader):
+        self.reader = reader
+        self.is_complete = True
         print("Successful Connection")
 
     @JOverride
     def onFailure(self, e):
+        self.is_complete = True
+        self.failed = True
         print("Failed Discovery")
 
 @JImplements(SetupIntentCallback)
@@ -106,6 +127,8 @@ class SetupIntentCallback:
     def __init__(self):
         self.is_complete = False
         self.setup_intent = None
+        self.failed = False
+        self.failure_message = None
 
     @JOverride
     def onSuccess(self, setupIntent):
@@ -114,7 +137,11 @@ class SetupIntentCallback:
 
     @JOverride
     def onFailure(self, e):
-        print("failed")
+        self.failed = True
+       # self.failure_message = e.errorMessage
+        self.is_complete=True
+        print (e)
+        #print("failed -- " + e.errorMessage)
 
 # Setup Terminal
 custom_mobile_reader_listener = CustomMobileReaderListener()
@@ -130,15 +157,24 @@ def discoverReaders():
     config = DiscoveryConfiguration.UsbDiscoveryConfiguration(0, True)
     Terminal.getInstance().discoverReaders(config, custom_discovery_listener, DiscoverReadersCallback())
 
+    while not custom_discovery_listener.reader_list:
+        print ('waiting for readers')
+        time.sleep(2) 
+
+    connectReader()
+
+
+
 def connectReader():
-    config = ConnectionConfiguration.UsbConnectionConfiguration("{{TERMINAL_LOCATION}}", False, custom_mobile_reader_listener)
+    config = ConnectionConfiguration.UsbConnectionConfiguration(TERMINAL_LOCATION_ID, False, custom_mobile_reader_listener)
+    # Hard-coding simulated reader M2
     Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[1], config, ConnectReadersCallback())
 
 def createConfirmSetupIntent():
     # Creating a Customer on the client, again just for illustration, this would have been done on a server
     setup_intent = client.setup_intents.create(params={
         "payment_method_types":["card_present"],
-        "customer":"{{CUSTOMER_ID}}",
+        "customer":CUSTOMER_ID,
     })
     setup_intent_retrieve_callback = SetupIntentCallback()
 
@@ -157,15 +193,23 @@ def createConfirmSetupIntent():
         print("waiting for collect to complete")
         time.sleep(2)
 
-    
+    if setup_intent_collect_callback.failed:
+        print("SetupIntent Failed")
+        return
+
     Terminal.getInstance().confirmSetupIntent(setup_intent_collect_callback.setup_intent, setup_intent_confirm_callback)
     while not setup_intent_confirm_callback.is_complete:
         print("waiting for confirm to complete")
         time.sleep(2)
 
+    if setup_intent_confirm_callback.failed:
+        print ("SetupIntent Failed")
+        return
+     
     print ("COMPLETE!")
 
-log_level = LogLevel.VERBOSE
+# uncomment this to get more logging, but it may be hard to interact with the terminal
+log_level = LogLevel.NONE
 
 file = File("/Users/tmcquinn/stripe/jpype-terminal-clear/testApp")
 app_info = ApplicationInformation("hi-payment-service", "0.0.0", file)
@@ -174,29 +218,18 @@ if not Terminal.isInitialized():
     Terminal.initTerminal(custom_connection_token_provider, custom_terminal_listener, app_info, log_level, None)
     Terminal.getInstance().setSimulatorConfiguration(simulator_configuration)
 
-user_input = input("Choose action:\n 1. Discover Readers \n 2. Connect Reader\n 3. Create/ConfirmSetupIntent")
+user_input = input("ℹ️ Start? Y/N\n")
 
 print (user_input)
 
-if user_input == "1":
+if user_input.lower() == "y" or user_input.lower() == "yes":
     discoverReaders()
-    print("discover reader done)")
+    print("Discovered Readers and Connected to simulated M2")
 else:
     print ("done")
 
-while not custom_discovery_listener.reader_list:
-    print ('waiting for readers')
-    time.sleep(2)
-
-
-print(custom_discovery_listener.reader_list)
-user_input = input("Choose reader")
-
-if user_input == "1":
-    connectReader()
-
-user_input = input("proceed")
-if user_input == "1":
+user_input = input("ℹ️ Proceed? Y/N\n")
+if user_input.lower() == "y" or user_input.lower() == "yes":
     createConfirmSetupIntent()
-
-
+else:
+    print ("done")
