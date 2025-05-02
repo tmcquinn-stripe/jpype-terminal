@@ -12,11 +12,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 SECRET_API_KEY = os.getenv('SECRET_API_KEY')
 TERMINAL_LOCATION_ID = os.getenv('TERMINAL_LOCATION_ID')
 CUSTOMER_ID = os.getenv('CUSTOMER_ID')
-
 
 
 # This is for illustration only, 
@@ -35,6 +33,7 @@ from com.stripe.stripeterminal.appinfo import *
 class CustomTerminalListener:
     @JOverride
     def onConnectionStatusChange(self, status):
+        print(status)
         print("onConnectionStatusChange: ")
     
     @JOverride
@@ -132,6 +131,7 @@ class SetupIntentCallback:
 
     @JOverride
     def onSuccess(self, setupIntent):
+        print(setupIntent)
         self.is_complete=True
         self.setup_intent= setupIntent
 
@@ -151,7 +151,7 @@ custom_discovery_listener = CustomDiscoveryListener()
 
 long_value = JLong(0)
 
-simulator_configuration = SimulatorConfiguration(SimulateReaderUpdate.NONE, SimulatedCard(SimulatedCardType.CHARGE_DECLINED_EXPIRED_CARD), long_value, False, SimulatedCollectInputsResult.SimulatedCollectInputsResultSucceeded())
+simulator_configuration = SimulatorConfiguration(SimulateReaderUpdate.NONE, SimulatedCard(SimulatedCardType.VISA), long_value, False, SimulatedCollectInputsResult.SimulatedCollectInputsResultSucceeded())
 
 def discoverReaders():
     config = DiscoveryConfiguration.UsbDiscoveryConfiguration(0, True)
@@ -162,7 +162,6 @@ def discoverReaders():
         time.sleep(2) 
 
     connectReader()
-
 
 
 def connectReader():
