@@ -304,12 +304,15 @@ def createConfirmSetupIntent():
 
 def promptSetupIntent(first):
     user_input = input("ℹ️ Would you like to create " + ("" if first else "another ") + "a SetupIntent? Y/N\n")
+    print('prompting')
     if user_input.lower() == "y" or user_input.lower() == "yes":
         createConfirmSetupIntent()
         promptSetupIntent(False)
+        print("returning")
         return 
     else:
         logging.info ("done")
+        print("returning")
         return
 
 # uncomment this to get more logging, but it may be hard to interact with the terminal
