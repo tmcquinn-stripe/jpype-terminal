@@ -35,7 +35,7 @@ file_handler.setLevel(logging.DEBUG)  # Log only ERROR and CRITICAL messages to 
 
 # # Example of logging to a stream
 stream_handler = logging.StreamHandler()  # Typically stdout or stderr
-stream_handler.setLevel(logging.INFO)  # Log INFO, WARNING, ERROR, CRITICAL, but not DEBUG
+stream_handler.setLevel(logging.DEBUG)  # Log INFO, WARNING, ERROR, CRITICAL, but not DEBUG
 logging.getLogger('stripe').setLevel(logging.WARNING)
 
 logger = logging.getLogger()
@@ -257,9 +257,12 @@ def connectReader():
     if USE_SIMULATOR == "true":
         # Hard-coding simulated reader M2
         Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[1], config, ConnectReadersCallback())
+        logger.info("Connected to Simulated M2")
     else:
         # just getting first reader
         Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[0], config, ConnectReadersCallback())
+        logger.info("Connected to real M2")
+
 
 
 def createConfirmSetupIntent():
@@ -304,15 +307,15 @@ def createConfirmSetupIntent():
 
 def promptSetupIntent(first):
     user_input = input("ℹ️ Would you like to create " + ("" if first else "another ") + "a SetupIntent? Y/N\n")
-    print('prompting')
+    logger.debug('prompting')
     if user_input.lower() == "y" or user_input.lower() == "yes":
         createConfirmSetupIntent()
         promptSetupIntent(False)
-        print("returning")
+        logger.debug("returning")
         return 
     else:
         logging.info ("done")
-        print("returning")
+        logger.debug("returning")
         return
 
 # uncomment this to get more logging, but it may be hard to interact with the terminal
@@ -330,12 +333,12 @@ logging.debug (user_input)
 
 if user_input.lower() == "y" or user_input.lower() == "yes":
     discoverReaders()
-    logging.info("Discovered Readers and Connected to simulated M2")
 else:
     logging.debug ("done")
 
 promptSetupIntent(True)
 
+logger.info("Exiting")
 
 file_output_stream.close()
 print_stream.close()
