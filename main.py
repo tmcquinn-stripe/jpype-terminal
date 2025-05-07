@@ -22,7 +22,7 @@ SECRET_API_KEY = os.getenv('SECRET_API_KEY')
 TERMINAL_LOCATION_ID = os.getenv('TERMINAL_LOCATION_ID')
 CUSTOMER_ID = os.getenv('CUSTOMER_ID')
 APP_LOCATION = os.getenv('APP_LOCATION')
-USE_SIMULATOR = os.getenv('USE_SIMULATOR')
+USE_SIMULATOR = True if str((os.getenv('USE_SIMULATOR'))).lower() == "true" else False
 
 logging.basicConfig(
     filename='app.log',  # Set the filename for the log file
