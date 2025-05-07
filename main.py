@@ -21,6 +21,8 @@ class SetupIntentComplete(Exception):
 SECRET_API_KEY = os.getenv('SECRET_API_KEY')
 TERMINAL_LOCATION_ID = os.getenv('TERMINAL_LOCATION_ID')
 CUSTOMER_ID = os.getenv('CUSTOMER_ID')
+APP_LOCATION = os.getenv('APP_LOCATION')
+USE_SIMULATOR = os.getenv('USE_SIMULATOR')
 
 logging.basicConfig(
     filename='app.log',  # Set the filename for the log file
@@ -216,7 +218,7 @@ long_value = JLong(0)
 simulator_configuration = SimulatorConfiguration(SimulateReaderUpdate.NONE, SimulatedCard(SimulatedCardType.VISA), long_value, False, SimulatedCollectInputsResult.SimulatedCollectInputsResultSucceeded())
 
 def discoverReaders():
-    config = DiscoveryConfiguration.UsbDiscoveryConfiguration(0, False)
+    config = DiscoveryConfiguration.UsbDiscoveryConfiguration(0, USE_SIMULATOR)
     Terminal.getInstance().discoverReaders(config, custom_discovery_listener, DiscoverReadersCallback())
 
     while not custom_discovery_listener.reader_list:
@@ -252,8 +254,13 @@ def askToCancelBasedOnCallback(cancelable):
 
 def connectReader():
     config = ConnectionConfiguration.UsbConnectionConfiguration(TERMINAL_LOCATION_ID, False, custom_mobile_reader_listener)
-    # Hard-coding simulated reader M2
-    Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[1], config, ConnectReadersCallback())
+    if USE_SIMULATOR == "true":
+        # Hard-coding simulated reader M2
+        Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[1], config, ConnectReadersCallback())
+    else:
+        # just getting first reader
+        Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[0], config, ConnectReadersCallback())
+
 
 def createConfirmSetupIntent():
     # Creating a Customer on the client, again just for illustration, this would have been done on a server
@@ -299,14 +306,15 @@ def promptSetupIntent(first):
     user_input = input("ℹ️ Would you like to create " + ("" if first else "another ") + "a SetupIntent? Y/N\n")
     if user_input.lower() == "y" or user_input.lower() == "yes":
         createConfirmSetupIntent()
+        promptSetupIntent(False)
+        return 
     else:
         logging.info ("done")
-        promptSetupIntent(False)
         return
 
 # uncomment this to get more logging, but it may be hard to interact with the terminal
 log_level = LogLevel.VERBOSE
-file = File("/Users/tmcquinn/stripe/jpype-terminal-clear/testApp")
+file = File(APP_LOCATION)
 app_info = ApplicationInformation("hi-payment-service", "0.0.0", file)
 
 if not Terminal.isInitialized():
