@@ -1,9 +1,11 @@
+from math import log
 import jpype
 import time
 import jpype.imports
 import stripe 
 import dotenv
 import os
+import logging
 
 from jpype.types import *
 from jpype import JImplements, JOverride, JImplementationFor
@@ -12,10 +14,41 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+class SetupIntentComplete(Exception):
+    pass 
+
 SECRET_API_KEY = os.getenv('SECRET_API_KEY')
 TERMINAL_LOCATION_ID = os.getenv('TERMINAL_LOCATION_ID')
 CUSTOMER_ID = os.getenv('CUSTOMER_ID')
 
+logging.basicConfig(
+    filename='app.log',  # Set the filename for the log file
+    level=logging.DEBUG,  # Set the logging level
+    format='%(asctime)s - %(levelname)s - %(message)s',  # Define the log message format
+)
+
+file_handler = logging.FileHandler('app.log')
+file_handler.setLevel(logging.DEBUG)  # Log only ERROR and CRITICAL messages to the file
+
+# # Example of logging to a stream
+stream_handler = logging.StreamHandler()  # Typically stdout or stderr
+stream_handler.setLevel(logging.INFO)  # Log INFO, WARNING, ERROR, CRITICAL, but not DEBUG
+logging.getLogger('stripe').setLevel(logging.WARNING)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+  # Set the logger to DEBUG level
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+if logger.hasHandlers():
+    logger.handlers.clear()
+    
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
+
+file_handler.setFormatter(formatter)
+stream_handler.setFormatter(formatter)
 
 # This is for illustration only, 
 # Terminal SDKs should call a backend service to retrieve a connection token.
@@ -27,18 +60,28 @@ from com.stripe.stripeterminal.external.callable import *
 from com.stripe.stripeterminal.external.models import *
 from com.stripe.stripeterminal.log import *
 from java.io import *
+from java.lang import *
 from com.stripe.stripeterminal.appinfo import *
+
+file_path = "java_log.log"
+file_output_stream = FileOutputStream(file_path)
+file_output_stream_err = FileOutputStream("java_log_err.log")   
+print_stream = PrintStream(file_output_stream)
+print_stream_err = PrintStream(file_output_stream_err)
+
+System.setOut(print_stream)
+System.setErr(print_stream_err)
+
 
 @JImplements(TerminalListener)
 class CustomTerminalListener:
     @JOverride
     def onConnectionStatusChange(self, status):
-        print(status)
-        print("onConnectionStatusChange: ")
+        logging.debug("onConnectionStatusChange: " + str(status))
     
     @JOverride
     def onPaymentStatusChange(self, status):
-        print("onConnectionStatusChange: ")
+        logging.debug("onConnectionStatusChange: " + str(status))
 
 @JImplements(ConnectionTokenProvider)
 class CustomConnectionTokenProviderImpl:
@@ -46,6 +89,7 @@ class CustomConnectionTokenProviderImpl:
 
     def fetchConnectionToken(self, callback):
         try:
+            logging.debug("Fetching new Connection Token");
             connection_token = client.terminal.connection_tokens.create()
             callback.onSuccess(connection_token.secret)
         except Exception as e:
@@ -57,32 +101,30 @@ class CustomMobileReaderListener:
     @JOverride
     # public void onStartInstallingUpdate(@NotNull ReaderSoftwareUpdate update, @NotNull Cancelable cancelable)
     def onStartInstallingUpdate(self, update, cancellable):
-        print("Installing Update")
+        logging.debug("Installing Update")
     
     @JOverride
     # public void onReportReaderSoftwareUpdateProgress(float progress)
     def onReportReaderSoftwareUpdateProgress(self, progress):
-        print("Update progress: ")
+        logging.debug("Update progress: " + str(progress))
 
     # public void onFinishInstallingUpdate(@Nullable ReaderSoftwareUpdate update, @Nullable TerminalException e) {
     @JOverride
     def onFinishInstallingUpdate(self, update, e):
-        print ("Finished update")
+        logging.debug("Finished update")
 
     @JOverride
     def onRequestReaderInput(self, options):
-        print("Request reader input: ")
+        logging.info("Request reader input: " + str(options))
     
     @JOverride
     def onRequestReaderDisplayMessage(self, message):
-        print("Request reader display: ") 
+        logging.info("Request reader display: " + str(message)) 
 
     @JOverride
     def onBatteryLevelUpdate(self, batteryLevel, batteryStatus, isCharging):
-        print("Battery Update")
+        logging.debug("Battery Update")
     
-print('hello')
-
 @JImplements(DiscoveryListener)
 class CustomDiscoveryListener:
     def __init__(self):
@@ -96,11 +138,11 @@ class CustomDiscoveryListener:
 class DiscoverReadersCallback:
     @JOverride
     def onSuccess(self):
-        print("Successful Discovery")
+        logging.debug("Successful Discovery")
 
     @JOverride
     def onFailure(self, e):
-        print("Failed Discovery")
+        logging.debug("Failed Discovery")
 
 @JImplements(ReaderCallback)
 class ConnectReadersCallback:
@@ -113,13 +155,13 @@ class ConnectReadersCallback:
     def onSuccess(self, reader):
         self.reader = reader
         self.is_complete = True
-        print("Successful Connection")
+        logging.debug("Successful Connection")
 
     @JOverride
     def onFailure(self, e):
         self.is_complete = True
         self.failed = True
-        print("Failed Discovery")
+        logging.debug("Failed Discovery")
 
 @JImplements(SetupIntentCallback)
 class SetupIntentCallback:
@@ -131,17 +173,37 @@ class SetupIntentCallback:
 
     @JOverride
     def onSuccess(self, setupIntent):
-        print(setupIntent)
+        logging.debug(setupIntent)
         self.is_complete=True
         self.setup_intent= setupIntent
+        raise SetupIntentComplete
 
     @JOverride
     def onFailure(self, e):
         self.failed = True
        # self.failure_message = e.errorMessage
         self.is_complete=True
-        print (e)
-        #print("failed -- " + e.errorMessage)
+        logging.debug (e)
+        #logging.debug("failed -- " + e.errorMessage)
+
+@JImplements(Callback)
+class CancelCallback:
+    def __init__(self):
+        self.is_complete = False
+        self.failed = False
+
+    @JOverride
+    def onSuccess(self):
+        self.is_complete= True
+        logging.debug("Successful Cancel")
+
+    @JOverride
+    def onFailure(self, e):
+        self.is_complete = False
+        self.failed = True
+
+        logging.debug("Failed Cancel")
+
 
 # Setup Terminal
 custom_mobile_reader_listener = CustomMobileReaderListener()
@@ -154,14 +216,38 @@ long_value = JLong(0)
 simulator_configuration = SimulatorConfiguration(SimulateReaderUpdate.NONE, SimulatedCard(SimulatedCardType.VISA), long_value, False, SimulatedCollectInputsResult.SimulatedCollectInputsResultSucceeded())
 
 def discoverReaders():
-    config = DiscoveryConfiguration.UsbDiscoveryConfiguration(0, True)
+    config = DiscoveryConfiguration.UsbDiscoveryConfiguration(0, False)
     Terminal.getInstance().discoverReaders(config, custom_discovery_listener, DiscoverReadersCallback())
 
     while not custom_discovery_listener.reader_list:
-        print ('waiting for readers')
+        logging.info('Waiting for readers to be discovered...')
         time.sleep(2) 
 
     connectReader()
+
+def askToCancelBasedOnCallback(cancelable):
+    try:
+        user_input = input("ℹ️ Would you like to cancel? Y/N\n")
+        if user_input.lower() == "y" or user_input.lower() == "yes":
+            cancel_callback = CancelCallback()
+            cancelable.cancel(cancel_callback)
+
+            while not cancel_callback.is_complete:
+                logging.info("Waiting for Cancel to complete")
+                time.sleep(2)
+            
+            if cancel_callback.failed: 
+                logging.error("Cancel failed")
+        
+            logging.info("Cancel successful")
+
+        return
+    except SetupIntentComplete:
+        logging.info("SetupIntent Complete")
+        return
+    except:
+        return
+    
 
 
 def connectReader():
@@ -180,36 +266,46 @@ def createConfirmSetupIntent():
 
     Terminal.getInstance().retrieveSetupIntent(setup_intent.client_secret, setup_intent_retrieve_callback)
     while not setup_intent_retrieve_callback.is_complete:
-        print("waiting for retrieve to complete")
+        logging.info("Waiting for SetupIntent to be retrieved...")
         time.sleep(2)
 
     setup_intent_collect_callback = SetupIntentCallback()
     setup_intent_confirm_callback = SetupIntentCallback()
 
-    Terminal.getInstance().collectSetupIntentPaymentMethod(setup_intent_retrieve_callback.setup_intent, AllowRedisplay.ALWAYS, setup_intent_collect_callback)
+    cancelable = Terminal.getInstance().collectSetupIntentPaymentMethod(setup_intent_retrieve_callback.setup_intent, AllowRedisplay.ALWAYS, setup_intent_collect_callback)
+
+    #askToCancelBasedOnCallback(cancelable) 
 
     while not setup_intent_collect_callback.is_complete:
-        print("waiting for collect to complete")
+        logging.info("waiting for collect to complete")
         time.sleep(2)
 
     if setup_intent_collect_callback.failed:
-        print("SetupIntent Failed")
+        logging.error("SetupIntent Failed")
         return
 
     Terminal.getInstance().confirmSetupIntent(setup_intent_collect_callback.setup_intent, setup_intent_confirm_callback)
     while not setup_intent_confirm_callback.is_complete:
-        print("waiting for confirm to complete")
+        logging.info("waiting for confirm to complete")
         time.sleep(2)
 
     if setup_intent_confirm_callback.failed:
-        print ("SetupIntent Failed")
+        logging.error ("SetupIntent Failed")
         return
      
-    print ("COMPLETE!")
+    logging.info ("COMPLETE!")
+
+def promptSetupIntent(first):
+    user_input = input("ℹ️ Would you like to create " + ("" if first else "another ") + "a SetupIntent? Y/N\n")
+    if user_input.lower() == "y" or user_input.lower() == "yes":
+        createConfirmSetupIntent()
+    else:
+        logging.info ("done")
+        promptSetupIntent(False)
+        return
 
 # uncomment this to get more logging, but it may be hard to interact with the terminal
-log_level = LogLevel.NONE
-
+log_level = LogLevel.VERBOSE
 file = File("/Users/tmcquinn/stripe/jpype-terminal-clear/testApp")
 app_info = ApplicationInformation("hi-payment-service", "0.0.0", file)
 
@@ -219,16 +315,17 @@ if not Terminal.isInitialized():
 
 user_input = input("ℹ️ Start? Y/N\n")
 
-print (user_input)
+logging.debug (user_input)
 
 if user_input.lower() == "y" or user_input.lower() == "yes":
     discoverReaders()
-    print("Discovered Readers and Connected to simulated M2")
+    logging.info("Discovered Readers and Connected to simulated M2")
 else:
-    print ("done")
+    logging.debug ("done")
 
-user_input = input("ℹ️ Proceed? Y/N\n")
-if user_input.lower() == "y" or user_input.lower() == "yes":
-    createConfirmSetupIntent()
-else:
-    print ("done")
+promptSetupIntent(True)
+
+
+file_output_stream.close()
+print_stream.close()
+jpype.shutdownJVM()
