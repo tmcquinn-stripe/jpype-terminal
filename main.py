@@ -55,7 +55,7 @@ stream_handler.setFormatter(formatter)
 # This is for illustration only, 
 # Terminal SDKs should call a backend service to retrieve a connection token.
 client = StripeClient(SECRET_API_KEY)
-jpype.startJVM(classpath=['target/samplejar.jar'])
+jpype.startJVM(classpath=['target/sample-jar-with-dependencies.jar'])
 
 from com.stripe.stripeterminal import *
 from com.stripe.stripeterminal.external.callable import *
