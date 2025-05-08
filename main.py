@@ -54,6 +54,9 @@ stream_handler.setFormatter(formatter)
 
 # This is for illustration only, 
 # Terminal SDKs should call a backend service to retrieve a connection token.
+if not SECRET_API_KEY:
+    raise ValueError("SECRET_API_KEY is not set. Please check your environment variables.")
+
 client = StripeClient(SECRET_API_KEY)
 jpype.startJVM(classpath=['target/sample-jar-with-dependencies.jar'])
 
@@ -126,6 +129,25 @@ class CustomMobileReaderListener:
     @JOverride
     def onBatteryLevelUpdate(self, batteryLevel, batteryStatus, isCharging):
         logging.debug("Battery Update")
+
+    @JOverride
+    def onDisconnect(self, reason):
+        logging.info("Disconnected: " + str(reason))
+        logging.info("Reconnecting manually...")
+        discoverReaders()
+
+    @JOverride
+    def onReaderReconnectStarted(self, reader, cancelReconnect, reason):
+        logging.debug("Reconnect started: " + str(reason))
+
+    @JOverride
+    def onReaderReconnectFailed(self, reader):
+        logging.debug("Reconnect failed:")
+
+    @JOverride
+    def onReaderReconnectSucceeded(self, reader):
+        logging.debug("Reconnect succeeded: " + str(reader))
+        logging.info("Reconnected to reader")
     
 @JImplements(DiscoveryListener)
 class CustomDiscoveryListener:
@@ -178,7 +200,8 @@ class SetupIntentCallback:
         logging.debug(setupIntent)
         self.is_complete=True
         self.setup_intent= setupIntent
-        raise SetupIntentComplete
+        print("SetupIntent: " + str(setupIntent))
+        #raise SetupIntentComplete
 
     @JOverride
     def onFailure(self, e):
@@ -186,7 +209,7 @@ class SetupIntentCallback:
        # self.failure_message = e.errorMessage
         self.is_complete=True
         logging.debug (e)
-        #logging.debug("failed -- " + e.errorMessage)
+        logging.debug("failed -- " + e.errorMessage)
 
 @JImplements(Callback)
 class CancelCallback:
@@ -254,7 +277,7 @@ def askToCancelBasedOnCallback(cancelable):
 
 def connectReader():
     config = ConnectionConfiguration.UsbConnectionConfiguration(TERMINAL_LOCATION_ID, False, custom_mobile_reader_listener)
-    if USE_SIMULATOR == "true":
+    if USE_SIMULATOR:
         # Hard-coding simulated reader M2
         Terminal.getInstance().connectReader(custom_discovery_listener.reader_list[1], config, ConnectReadersCallback())
         logger.info("Connected to Simulated M2")
@@ -279,12 +302,20 @@ def createConfirmSetupIntent():
         logging.info("Waiting for SetupIntent to be retrieved...")
         time.sleep(2)
 
+    if setup_intent_retrieve_callback.failed:
+        logging.error("SetupIntent Failed")
+        return
+
     setup_intent_collect_callback = SetupIntentCallback()
     setup_intent_confirm_callback = SetupIntentCallback()
 
     cancelable = Terminal.getInstance().collectSetupIntentPaymentMethod(setup_intent_retrieve_callback.setup_intent, AllowRedisplay.ALWAYS, setup_intent_collect_callback)
 
-    #askToCancelBasedOnCallback(cancelable) 
+    try: 
+        askToCancelBasedOnCallback(cancelable) 
+    except SetupIntentComplete:
+        logging.info("cant cancel no more Complete")
+        return
 
     while not setup_intent_collect_callback.is_complete:
         logging.info("waiting for collect to complete")
