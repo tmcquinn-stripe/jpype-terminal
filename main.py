@@ -118,7 +118,7 @@ class CustomMobileReaderListener:
 
     @JOverride
     def onReportAvailableUpdate(self, update):
-        logging.info("Available update: " + str(update))
+        logging.info("Available update - Required At: " + str(update.requiredAtMs) + " Version: " + update.version)
 
     @JOverride
     def onRequestReaderInput(self, options):
