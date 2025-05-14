@@ -13,8 +13,6 @@ from stripe import StripeClient
 from dotenv import load_dotenv
 
 load_dotenv()
-
-
 class SetupIntentComplete(Exception):
     pass 
 
@@ -117,6 +115,10 @@ class CustomMobileReaderListener:
     @JOverride
     def onFinishInstallingUpdate(self, update, e):
         logging.debug("Finished update")
+
+    @JOverride
+    def onReportAvailableUpdate(self, update):
+        logging.debug("Available update: " + str(update))
 
     @JOverride
     def onRequestReaderInput(self, options):
