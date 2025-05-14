@@ -104,21 +104,21 @@ class CustomMobileReaderListener:
     @JOverride
     # public void onStartInstallingUpdate(@NotNull ReaderSoftwareUpdate update, @NotNull Cancelable cancelable)
     def onStartInstallingUpdate(self, update, cancellable):
-        logging.debug("Installing Update")
+        logging.info("Installing Update")
     
     @JOverride
     # public void onReportReaderSoftwareUpdateProgress(float progress)
     def onReportReaderSoftwareUpdateProgress(self, progress):
-        logging.debug("Update progress: " + str(progress))
+        logging.info("Update progress: " + str(progress))
 
     # public void onFinishInstallingUpdate(@Nullable ReaderSoftwareUpdate update, @Nullable TerminalException e) {
     @JOverride
     def onFinishInstallingUpdate(self, update, e):
-        logging.debug("Finished update")
+        logging.info("Finished update")
 
     @JOverride
     def onReportAvailableUpdate(self, update):
-        logging.debug("Available update: " + str(update))
+        logging.info("Available update: " + str(update))
 
     @JOverride
     def onRequestReaderInput(self, options):
